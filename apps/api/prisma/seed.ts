@@ -73,26 +73,37 @@ async function main() {
       id: uuidv4(),
       email: 'admin@vybe.app',
       phone: '+1555000001',
-      username: 'admin',
+      username: 'vybe_admin',
       displayName: 'VYBE Admin',
       role: 'admin',
-      dateOfBirth: new Date('1990-01-01'),
-      isVerified: true,
-      onboardingComplete: true,
+      birthDate: new Date('1990-01-01'),
       status: 'active',
     },
   });
 
-  // Create auth identity for admin
+  // Create auth identity for admin (email-based)
   await prisma.authIdentity.upsert({
-    where: { provider_providerKey: { provider: 'email', providerKey: 'admin@vybe.app' } },
+    where: { provider_email: { provider: 'email', email: 'admin@vybe.app' } },
     update: {},
     create: {
       id: uuidv4(),
       userId: adminUser.id,
       provider: 'email',
-      providerKey: 'admin@vybe.app',
-      passwordHash,
+      email: 'admin@vybe.app',
+      isPrimary: true,
+      verifiedAt: new Date(),
+    },
+  });
+
+  // Create password credential for admin
+  await prisma.passwordCredential.upsert({
+    where: { userId: adminUser.id },
+    update: {},
+    create: {
+      id: uuidv4(),
+      userId: adminUser.id,
+      hash: passwordHash,
+      algorithm: 'bcrypt',
     },
   });
 
@@ -104,7 +115,6 @@ async function main() {
       id: uuidv4(),
       userId: adminUser.id,
       bio: 'Platform administrator',
-      location: 'San Francisco, CA',
     },
   });
 
@@ -118,6 +128,19 @@ async function main() {
     },
   });
 
+  // Create admin onboarding (complete)
+  await prisma.onboardingProgress.upsert({
+    where: { userId: adminUser.id },
+    update: {},
+    create: {
+      id: uuidv4(),
+      userId: adminUser.id,
+      currentStep: 'complete',
+      isComplete: true,
+      completedSteps: JSON.stringify(['interests', 'avatar', 'contacts', 'follow_suggestions', 'first_post']),
+    },
+  });
+
   console.log(`  Created admin user: ${adminUser.username} (${adminUser.email})`);
 
   const moderatorUser = await prisma.user.upsert({
@@ -127,25 +150,35 @@ async function main() {
       id: uuidv4(),
       email: 'mod@vybe.app',
       phone: '+1555000002',
-      username: 'moderator',
+      username: 'vybe_mod',
       displayName: 'VYBE Moderator',
       role: 'moderator',
-      dateOfBirth: new Date('1992-06-15'),
-      isVerified: true,
-      onboardingComplete: true,
+      birthDate: new Date('1992-06-15'),
       status: 'active',
     },
   });
 
   await prisma.authIdentity.upsert({
-    where: { provider_providerKey: { provider: 'email', providerKey: 'mod@vybe.app' } },
+    where: { provider_email: { provider: 'email', email: 'mod@vybe.app' } },
     update: {},
     create: {
       id: uuidv4(),
       userId: moderatorUser.id,
       provider: 'email',
-      providerKey: 'mod@vybe.app',
-      passwordHash,
+      email: 'mod@vybe.app',
+      isPrimary: true,
+      verifiedAt: new Date(),
+    },
+  });
+
+  await prisma.passwordCredential.upsert({
+    where: { userId: moderatorUser.id },
+    update: {},
+    create: {
+      id: uuidv4(),
+      userId: moderatorUser.id,
+      hash: passwordHash,
+      algorithm: 'bcrypt',
     },
   });
 
@@ -165,6 +198,18 @@ async function main() {
     create: {
       id: uuidv4(),
       userId: moderatorUser.id,
+    },
+  });
+
+  await prisma.onboardingProgress.upsert({
+    where: { userId: moderatorUser.id },
+    update: {},
+    create: {
+      id: uuidv4(),
+      userId: moderatorUser.id,
+      currentStep: 'complete',
+      isComplete: true,
+      completedSteps: JSON.stringify(['interests', 'avatar', 'contacts', 'follow_suggestions', 'first_post']),
     },
   });
 
@@ -191,22 +236,32 @@ async function main() {
         username: userData.username,
         displayName: userData.displayName,
         role: 'user',
-        dateOfBirth: new Date('1995-03-20'),
-        isVerified: true,
-        onboardingComplete: true,
+        birthDate: new Date('1995-03-20'),
         status: 'active',
       },
     });
 
     await prisma.authIdentity.upsert({
-      where: { provider_providerKey: { provider: 'email', providerKey: userData.email } },
+      where: { provider_email: { provider: 'email', email: userData.email } },
       update: {},
       create: {
         id: uuidv4(),
         userId: user.id,
         provider: 'email',
-        providerKey: userData.email,
-        passwordHash,
+        email: userData.email,
+        isPrimary: true,
+        verifiedAt: new Date(),
+      },
+    });
+
+    await prisma.passwordCredential.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        id: uuidv4(),
+        userId: user.id,
+        hash: passwordHash,
+        algorithm: 'bcrypt',
       },
     });
 
@@ -226,6 +281,18 @@ async function main() {
       create: {
         id: uuidv4(),
         userId: user.id,
+      },
+    });
+
+    await prisma.onboardingProgress.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        id: uuidv4(),
+        userId: user.id,
+        currentStep: 'complete',
+        isComplete: true,
+        completedSteps: JSON.stringify(['interests', 'avatar', 'contacts', 'follow_suggestions', 'first_post']),
       },
     });
 
@@ -263,24 +330,23 @@ async function main() {
 
   // ─── Sample Content ────────────────────────────────────────
   const samplePosts = [
-    { authorIdx: 0, body: 'Just captured the most amazing sunset at the beach! The colors were unreal.', hashtags: ['photography', 'sunset', 'nature'] },
-    { authorIdx: 1, body: 'New beat just dropped! Been working on this track for weeks. Let me know what you think.', hashtags: ['music', 'producer', 'newmusic'] },
-    { authorIdx: 2, body: 'Anyone else excited about the new AI developments? The pace of innovation is incredible.', hashtags: ['technology', 'ai', 'innovation'] },
-    { authorIdx: 3, body: 'Morning workout done! Remember: consistency beats intensity every time.', hashtags: ['fitness', 'motivation', 'health'] },
-    { authorIdx: 4, body: 'Made the most delicious homemade pasta today. Recipe coming soon!', hashtags: ['food', 'cooking', 'homemade'] },
-    { authorIdx: 0, body: 'Exploring the streets of Tokyo. Every corner has a story to tell.', hashtags: ['travel', 'tokyo', 'streetphotography'] },
-    { authorIdx: 1, body: 'Collaboration is the key to great music. Grateful for my studio session today.', hashtags: ['music', 'collaboration', 'studio'] },
-    { authorIdx: 2, body: 'Just set up my new home lab. Ready for some serious tinkering!', hashtags: ['technology', 'homelab', 'diy'] },
+    { authorIdx: 0, caption: 'Just captured the most amazing sunset at the beach! The colors were unreal.', hashtags: ['photography', 'sunset', 'nature'] },
+    { authorIdx: 1, caption: 'New beat just dropped! Been working on this track for weeks. Let me know what you think.', hashtags: ['music', 'producer', 'newmusic'] },
+    { authorIdx: 2, caption: 'Anyone else excited about the new AI developments? The pace of innovation is incredible.', hashtags: ['technology', 'ai', 'innovation'] },
+    { authorIdx: 3, caption: 'Morning workout done! Remember: consistency beats intensity every time.', hashtags: ['fitness', 'motivation', 'health'] },
+    { authorIdx: 4, caption: 'Made the most delicious homemade pasta today. Recipe coming soon!', hashtags: ['food', 'cooking', 'homemade'] },
+    { authorIdx: 0, caption: 'Exploring the streets of Tokyo. Every corner has a story to tell.', hashtags: ['travel', 'tokyo', 'streetphotography'] },
+    { authorIdx: 1, caption: 'Collaboration is the key to great music. Grateful for my studio session today.', hashtags: ['music', 'collaboration', 'studio'] },
+    { authorIdx: 2, caption: 'Just set up my new home lab. Ready for some serious tinkering!', hashtags: ['technology', 'homelab', 'diy'] },
   ];
 
   for (const post of samplePosts) {
-    const contentId = uuidv4();
     await prisma.contentItem.create({
       data: {
-        id: contentId,
+        id: uuidv4(),
         authorId: createdUsers[post.authorIdx].id,
-        type: 'post',
-        body: post.body,
+        type: 'text_media_thread',
+        caption: post.caption,
         audience: 'public',
         status: 'published',
         hashtags: JSON.stringify(post.hashtags),
@@ -320,23 +386,27 @@ async function main() {
     }
     console.log(`  Created sample comments`);
 
-    // Add some reactions
+    // Add some reactions (using Reaction model with actorId_targetType_targetId unique key)
     for (let i = 0; i < Math.min(4, publishedContent.length); i++) {
       for (let j = 0; j < 3; j++) {
         const userIdx = (i + j + 1) % createdUsers.length;
+        const actorId = createdUsers[userIdx].id;
+        const targetId = publishedContent[i].id;
         await prisma.reaction.upsert({
           where: {
-            contentId_actorId: {
-              contentId: publishedContent[i].id,
-              actorId: createdUsers[userIdx].id,
+            actorId_targetType_targetId: {
+              actorId,
+              targetType: 'content',
+              targetId,
             },
           },
           update: {},
           create: {
             id: uuidv4(),
-            contentId: publishedContent[i].id,
-            actorId: createdUsers[userIdx].id,
-            emoji: ['like', 'love', 'fire'][j],
+            actorId,
+            targetType: 'content',
+            targetId,
+            reactionType: ['like', 'love', 'fire'][j],
           },
         });
       }

@@ -330,11 +330,13 @@ export const authService = {
       },
     });
 
-    const refreshToken = generateRefreshToken(uuidv4());
+    const sessionId = uuidv4();
+    const refreshToken = generateRefreshToken(sessionId);
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
     await prisma.session.create({
       data: {
+        id: sessionId,
         userId: user.id,
         deviceId: device.id,
         refreshTokenHash,
@@ -357,32 +359,30 @@ export const authService = {
       throw new AppError(401, 'INVALID_REFRESH_TOKEN', 'Invalid or expired refresh token');
     }
 
-    const sessions = await prisma.session.findMany({
-      where: { revokedAt: null, expiresAt: { gt: new Date() } },
+    // Look up the specific session by ID from the JWT payload (O(1) instead of O(n))
+    const session = await prisma.session.findUnique({
+      where: { id: payload.sessionId },
       include: { user: true },
     });
 
-    // Find matching session by comparing hash
-    let matchedSession = null;
-    for (const session of sessions) {
-      const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
-      if (isMatch) {
-        matchedSession = session;
-        break;
-      }
-    }
-
-    if (!matchedSession) {
+    if (!session || session.revokedAt || session.expiresAt < new Date()) {
       throw new AppError(401, 'SESSION_EXPIRED', 'Session not found or expired');
     }
 
-    const user = matchedSession.user;
+    // Verify the refresh token hash matches
+    const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
+    if (!isMatch) {
+      throw new AppError(401, 'INVALID_REFRESH_TOKEN', 'Invalid refresh token');
+    }
+
+    const user = session.user;
     const newAccessToken = generateAccessToken(user);
-    const newRefreshToken = generateRefreshToken(uuidv4());
+    const newSessionId = session.id; // reuse same session ID
+    const newRefreshToken = generateRefreshToken(newSessionId);
     const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
 
     await prisma.session.update({
-      where: { id: matchedSession.id },
+      where: { id: session.id },
       data: { refreshTokenHash: newRefreshTokenHash },
     });
 
