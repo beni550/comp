@@ -4,10 +4,12 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { createServer } from 'http';
 import { PrismaClient } from '@prisma/client';
+import swaggerUi from 'swagger-ui-express';
 
 import { errorHandler } from './middleware/error-handler';
 import { requestId } from './middleware/request-id';
 import { generalRateLimiter } from './middleware/rate-limit';
+import { swaggerSpec } from './swagger';
 import { authRouter } from './modules/auth/auth.router';
 import { usersRouter } from './modules/users/users.router';
 import { socialRouter } from './modules/social/social.router';
@@ -35,6 +37,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 app.use(requestId);
 app.use(generalRateLimiter);
+
+// ─── Swagger Documentation ──────────────────────────────────
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'VYBE API Documentation',
+}));
+app.get('/api/docs.json', (_req, res) => {
+  res.json(swaggerSpec);
+});
 
 // ─── Health Check ───────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => {
