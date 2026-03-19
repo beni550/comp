@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../../main';
@@ -37,6 +38,17 @@ function generateRefreshToken(sessionId: string): string {
     JWT_REFRESH_SECRET,
     { expiresIn: `${APP_CONFIG.REFRESH_TOKEN_TTL_DAYS}d` }
   );
+}
+
+/**
+ * SHA-256 pre-hash for bcrypt input.
+ * bcrypt silently truncates inputs longer than 72 bytes. JWTs exceed this limit,
+ * so tokens that differ only after byte 72 would produce identical bcrypt hashes.
+ * Pre-hashing with SHA-256 produces a fixed 64-char hex string, ensuring the
+ * full token is considered.
+ */
+function sha256(input: string): string {
+  return crypto.createHash('sha256').update(input).digest('hex');
 }
 
 export const authService = {
@@ -332,7 +344,7 @@ export const authService = {
 
     const sessionId = uuidv4();
     const refreshToken = generateRefreshToken(sessionId);
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    const refreshTokenHash = await bcrypt.hash(sha256(refreshToken), 10);
 
     await prisma.session.create({
       data: {
@@ -370,7 +382,7 @@ export const authService = {
     }
 
     // Verify the refresh token hash matches
-    const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
+    const isMatch = await bcrypt.compare(sha256(refreshToken), session.refreshTokenHash);
     if (!isMatch) {
       throw new AppError(401, 'INVALID_REFRESH_TOKEN', 'Invalid refresh token');
     }
@@ -379,7 +391,7 @@ export const authService = {
     const newAccessToken = generateAccessToken(user);
     const newSessionId = session.id; // reuse same session ID
     const newRefreshToken = generateRefreshToken(newSessionId);
-    const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
+    const newRefreshTokenHash = await bcrypt.hash(sha256(newRefreshToken), 10);
 
     await prisma.session.update({
       where: { id: session.id },
