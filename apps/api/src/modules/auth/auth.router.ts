@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service';
 import { authenticate } from '../../middleware/auth';
 import { success } from '../../common/response';
+import { authRateLimiter, otpRateLimiter } from '../../middleware/rate-limit';
 import {
   registerPhoneStartSchema,
   registerPhoneVerifySchema,
@@ -12,7 +13,7 @@ import {
 export const authRouter = Router();
 
 // POST /auth/register/phone/start
-authRouter.post('/register/phone/start', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/register/phone/start', otpRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerPhoneStartSchema.parse(req.body);
     const result = await authService.registerPhoneStart(data.phone);
@@ -23,7 +24,7 @@ authRouter.post('/register/phone/start', async (req: Request, res: Response, nex
 });
 
 // POST /auth/register/phone/verify
-authRouter.post('/register/phone/verify', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/register/phone/verify', authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerPhoneVerifySchema.parse(req.body);
     const result = await authService.registerPhoneVerify(data);
@@ -38,7 +39,7 @@ authRouter.post('/register/phone/verify', async (req: Request, res: Response, ne
 });
 
 // POST /auth/register/email/start
-authRouter.post('/register/email/start', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/register/email/start', otpRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerEmailStartSchema.parse(req.body);
     const result = await authService.registerEmailStart(data.email);
@@ -49,7 +50,7 @@ authRouter.post('/register/email/start', async (req: Request, res: Response, nex
 });
 
 // POST /auth/login
-authRouter.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/login', authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = loginSchema.parse(req.body);
     const result = await authService.login({
@@ -143,7 +144,7 @@ authRouter.get('/username/check/:username', async (req: Request, res: Response, 
 });
 
 // POST /auth/recovery/start
-authRouter.post('/recovery/start', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/recovery/start', otpRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier } = req.body;
     if (!identifier) {

@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { errorHandler } from './middleware/error-handler';
 import { requestId } from './middleware/request-id';
+import { generalRateLimiter } from './middleware/rate-limit';
 import { authRouter } from './modules/auth/auth.router';
 import { usersRouter } from './modules/users/users.router';
 import { socialRouter } from './modules/social/social.router';
@@ -33,6 +34,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 app.use(requestId);
+app.use(generalRateLimiter);
 
 // ─── Health Check ───────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => {
